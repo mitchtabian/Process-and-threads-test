@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -35,7 +36,7 @@ public class StreamingService extends Service implements
 
     private Messenger mMessenger = new Messenger(new StreamingHandler());
     private MediaPlayer mMediaPlayer = null;
-    private int mSeekTo = 0;
+    private int mSeekTo = -1;
 
     @Nullable
     @Override
@@ -55,9 +56,15 @@ public class StreamingService extends Service implements
         mMediaPlayer.start();
     }
 
+    private void resetMediaPlayer(){
+        mMediaPlayer.pause();
+        mSeekTo = 0;
+        mMediaPlayer.seekTo(0);
+    }
 
     @SuppressLint("HandlerLeak")
     class StreamingHandler extends Handler {
+        @SuppressLint("StaticFieldLeak")
         @Override
         public void handleMessage(Message msg) {
             Log.d(TAG, "handleMessage: received message from client.");
@@ -102,12 +109,32 @@ public class StreamingService extends Service implements
                     } catch (RemoteException e) {
                         e.printStackTrace();
                     }
+
+                    if(mMediaPlayer.getCurrentPosition() + (mMediaPlayer.getDuration() * 0.001)  >= mMediaPlayer.getDuration()
+                            && !mMediaPlayer.isPlaying()){
+
+                        new AsyncTask<Void, Void, Void>(){
+                            @Override
+                            protected Void doInBackground(Void... voids) {
+                                Intent playbackCompleteIntent = new Intent("action.playback.state.change");
+                                sendBroadcast(playbackCompleteIntent);
+                                return null;
+                            }
+
+                            @Override
+                            protected void onPostExecute(Void aVoid) {
+                                resetMediaPlayer();
+                                super.onPostExecute(aVoid);
+                            }
+                        }.execute();
+                    }
                     break;
                 }
 
                 case Constants.MSG_SEEK:{
                     Log.d(TAG, "handleMessage: message = SEEK.");
                     mSeekTo = msg.arg1;
+                    mMediaPlayer.seekTo(mSeekTo);
 
                     break;
                 }

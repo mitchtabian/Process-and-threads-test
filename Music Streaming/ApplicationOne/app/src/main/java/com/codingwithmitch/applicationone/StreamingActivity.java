@@ -6,6 +6,7 @@ import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -308,12 +309,20 @@ public class StreamingActivity extends AppCompatActivity implements
     protected void onPause() {
         super.onPause();
         stopPlaybackTracker();
+        unregisterReceiver(mPlaybackBroadcastReceiver);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         startPlaybackTracker();
+        registerPlaybackBroadcastReceiver();
+    }
+
+    private void registerPlaybackBroadcastReceiver(){
+        IntentFilter playbackIntentFilter = new IntentFilter();
+        playbackIntentFilter.addAction("action.playback.state.change");
+        registerReceiver(mPlaybackBroadcastReceiver, playbackIntentFilter);
     }
 
     @Override
@@ -337,17 +346,22 @@ public class StreamingActivity extends AppCompatActivity implements
 
     @Override
     public void onStopTrackingTouch(SeekBar seekBar) {
+        if(mPlaybackState == PLAYBACK_PLAY){
+            resumeSelectedTrack();
+        }
         startPlaybackTracker();
-        resumeSelectedTrack();
     }
 
-    private class PlaybackBroadcastReceiver extends BroadcastReceiver{
-            
+    private BroadcastReceiver mPlaybackBroadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-
+            if(mPlaybackState != PLAYBACK_APP_LAUNCH){
+                Log.d(TAG, "onReceive: called.");
+                mPlaybackState = PLAYBACK_PAUSE;
+                setPlaybackIcon();
+            }
         }
-    }
+    };
 }
 
 
